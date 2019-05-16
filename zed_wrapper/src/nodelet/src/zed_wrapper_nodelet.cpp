@@ -18,6 +18,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+
 #include "zed_wrapper_nodelet.hpp"
 
 #ifndef NDEBUG
@@ -33,6 +34,7 @@
 #include <stereo_msgs/DisparityImage.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
 
 #include <chrono>
 
@@ -119,6 +121,12 @@ namespace zed_wrapper {
 
         string odom_path_topic = "path_odom";
         string map_path_topic = "path_map";
+
+        // For PX4
+        string mavros_topic;
+        mavros_topic = "/mavros/vision_pose/pose";
+        string mavros_cov_topic;
+        mavros_cov_topic = "/mavros/vision_pose/pose_cov";
 
         // Create camera info
         mRgbCamInfoMsg.reset(new sensor_msgs::CameraInfo());
@@ -380,9 +388,17 @@ namespace zed_wrapper {
         mPubPose = mNhNs.advertise<geometry_msgs::PoseStamped>(mPoseTopic, 1);
         NODELET_INFO_STREAM("Advertised on topic " << mPubPose.getTopic());
 
+        // For PX4
+        mPubPoseMavros = mNhNs.advertise<geometry_msgs::PoseStamped>(mavros_topic, 1);
+        NODELET_INFO_STREAM("Advertised on topic " << mPubPoseMavros.getTopic());
+
         if (mPublishPoseCovariance) {
             mPubPoseCov = mNhNs.advertise<geometry_msgs::PoseWithCovarianceStamped>(pose_cov_topic, 1);
             NODELET_INFO_STREAM("Advertised on topic " << mPubPoseCov.getTopic());
+
+            // For PX4
+            mPubPoseMavrosCov = mNhNs.advertise<geometry_msgs::PoseWithCovarianceStamped>(mavros_cov_topic, 1);
+            NODELET_INFO_STREAM("Advertised on topic " << mPubPoseMavrosCov.getTopic());
         }
 
         mPubOdom = mNhNs.advertise<nav_msgs::Odometry>(mOdometryTopic, 1);
@@ -1283,6 +1299,7 @@ namespace zed_wrapper {
 
             // Publish pose stamped message
             mPubPose.publish(poseNoCov);
+            mPubPoseMavros.publish(poseNoCov);
         }
 
         if (mPublishPoseCovariance) {
@@ -1319,6 +1336,7 @@ namespace zed_wrapper {
 
                 // Publish pose with covariance stamped message
                 mPubPoseCov.publish(poseCov);
+                mPubPoseMavrosCov.publish(poseCov);
             }
         }
     }
@@ -2140,6 +2158,9 @@ namespace zed_wrapper {
             uint32_t pathSubNumber = mPubMapPath.getNumSubscribers() + mPubOdomPath.getNumSubscribers();
             uint32_t stereoSubNumber = mPubStereo.getNumSubscribers();
             uint32_t stereoRawSubNumber = mPubRawStereo.getNumSubscribers();
+            // For PX4
+            uint32_t mavSubnumber = mPubPoseMavros.getNumSubscribers();
+            uint32_t mavCovSubnumber = mPubPoseMavrosCov.getNumSubscribers();
 
             mGrabActive =  mRecording || mStreaming || mMappingEnabled || mTrackingActivated ||
                            ((rgbSubnumber + rgbRawSubnumber + leftSubnumber +
@@ -2147,7 +2168,7 @@ namespace zed_wrapper {
                              depthSubnumber + disparitySubnumber + cloudSubnumber +
                              poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
                              confMapSubnumber /*+ imuSubnumber + imuRawsubnumber*/ + pathSubNumber +
-                             stereoSubNumber + stereoRawSubNumber) > 0);
+                             stereoSubNumber + stereoRawSubNumber + mavSubnumber + mavCovSubnumber) > 0);
 
             runParams.enable_point_cloud = false;
 
@@ -2157,7 +2178,8 @@ namespace zed_wrapper {
 
                 // Note: one tracking is started is never stopped anymore
                 bool computeTracking = (mMappingEnabled || (mComputeDepth & mDepthStabilization) || poseSubnumber > 0 ||
-                                        poseCovSubnumber > 0 || odomSubnumber > 0 || pathSubNumber > 0);
+                                        poseCovSubnumber > 0 || odomSubnumber > 0 || pathSubNumber > 0 || mavSubnumber > 0 ||
+                                        mavCovSubnumber > 0);
 
                 // Start the tracking?
                 if ((computeTracking) && !mTrackingActivated && (mCamQuality != sl::DEPTH_MODE_NONE)) {
@@ -2173,7 +2195,7 @@ namespace zed_wrapper {
                 mComputeDepth = mCamQuality != sl::DEPTH_MODE_NONE &&
                                 ((depthSubnumber + disparitySubnumber + cloudSubnumber + fusedCloudSubnumber +
                                   poseSubnumber + poseCovSubnumber + odomSubnumber + confImgSubnumber +
-                                  confMapSubnumber) > 0);
+                                  confMapSubnumber + mavSubnumber + mavCovSubnumber) > 0);
 
                 if (mComputeDepth) {
                     int actual_confidence = mZed.getConfidenceThreshold();
@@ -2242,7 +2264,7 @@ namespace zed_wrapper {
                         mTrackingActivated = false;
 
                         computeTracking = mDepthStabilization || poseSubnumber > 0 || poseCovSubnumber > 0 ||
-                                          odomSubnumber > 0;
+                                          odomSubnumber > 0 || mavSubnumber > 0 || mavCovSubnumber > 0;
 
                         if (computeTracking) {  // Start the tracking
                             start_tracking();
@@ -2628,7 +2650,7 @@ namespace zed_wrapper {
                         }
 
                         // Publish Pose message
-                        if ((poseSubnumber + poseCovSubnumber) > 0) {
+                        if ((poseSubnumber + poseCovSubnumber + mavSubnumber + mavCovSubnumber) > 0) {
                             publishPose(mFrameTimestamp);
                         }
 

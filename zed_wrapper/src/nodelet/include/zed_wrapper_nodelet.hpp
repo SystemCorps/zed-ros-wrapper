@@ -328,6 +328,10 @@ namespace zed_wrapper {
         ros::Publisher mPubMapPath;
         ros::Publisher mPubImu;
         ros::Publisher mPubImuRaw;
+        // For PX4
+        ros::Publisher mPubPoseMavros;
+        ros::Publisher mPubPoseMavrosCov;
+
 
         // Timers
         ros::Timer mImuTimer;
