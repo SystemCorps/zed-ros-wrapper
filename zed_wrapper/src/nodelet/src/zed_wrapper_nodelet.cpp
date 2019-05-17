@@ -1290,7 +1290,8 @@ namespace zed_wrapper {
         pose.orientation.z = base2frame.rotation.z;
         pose.orientation.w = base2frame.rotation.w;
 
-        if (mPubPose.getNumSubscribers() > 0) {
+        //if (mPubPose.getNumSubscribers() > 0) {
+        if (true) {
 
             geometry_msgs::PoseStamped poseNoCov;
 
@@ -1303,7 +1304,8 @@ namespace zed_wrapper {
         }
 
         if (mPublishPoseCovariance) {
-            if (mPubPoseCov.getNumSubscribers() > 0) {
+            //if (mPubPoseCov.getNumSubscribers() > 0) {
+            if (true) {
                 geometry_msgs::PoseWithCovarianceStamped poseCov;
 
                 poseCov.header = header;
@@ -2160,6 +2162,7 @@ namespace zed_wrapper {
             uint32_t stereoRawSubNumber = mPubRawStereo.getNumSubscribers();
             // For PX4
             uint32_t mavSubnumber = mPubPoseMavros.getNumSubscribers();
+            //uint32_t mavSubnumber = 0;
             uint32_t mavCovSubnumber = mPubPoseMavrosCov.getNumSubscribers();
 
             mGrabActive =  mRecording || mStreaming || mMappingEnabled || mTrackingActivated ||
